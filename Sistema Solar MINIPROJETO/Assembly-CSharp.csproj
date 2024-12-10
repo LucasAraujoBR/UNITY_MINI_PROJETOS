@@ -62,6 +62,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Scripts\CameraModeSwitcher.cs" />
+    <Compile Include="Assets\Scripts\heightmap.cs" />
     <Compile Include="Assets\SpaceSkies Free\Demo\Scripts\LookCamera.cs" />
     <Compile Include="Assets\Scripts\SpaceshipController.cs" />
     <Compile Include="Assets\Scripts\CameraeModeSwitcher.cs" />

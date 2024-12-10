@@ -1,25 +1,114 @@
 using UnityEngine;
 
-public class FollowSpaceship : MonoBehaviour
+public class ControlSpaceship : MonoBehaviour
 {
-    public Transform spaceship; // Referência à nave espacial
-    public Vector3 offset = new Vector3(0, 5, -10); // Offset da câmera em relação à nave
-    public float smoothSpeed = 0.125f; // Velocidade de suavização
+    public float acceleration = 25f;
+    public float speed = 100f;
+    public float maxSpeed = 100f;
+    public float sidewaysSpeed = 25f;
+    public float rotationSpeed = 2f;
+    public float gravityInfluenceFactor = 1f;
 
-    void LateUpdate()
+    private Vector3 targetForward = Vector3.zero;
+
+    // Câmera que seguirá a nave
+    public Transform cameraTransform;
+    public Vector3 cameraOffset = new Vector3(0, 5, -10);
+
+    void Start()
     {
-        if (spaceship == null) return;
+        // Inicializar a direção da nave
+        targetForward = transform.forward;
 
-        // Calcula a posição desejada
-        Vector3 desiredPosition = spaceship.position + offset;
+        // Verificar se a câmera foi atribuída
+        if (cameraTransform == null && Camera.main != null)
+        {
+            cameraTransform = Camera.main.transform;
+        }
+    }
 
-        // Suaviza a transição para a posição desejada
-        Vector3 smoothedPosition = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed);
+    void Update()
+    {
+        // Entrada do mouse para rotação
+        float deltaX = Input.GetAxis("Mouse X");
+        float deltaY = Input.GetAxis("Mouse Y");
 
-        // Atualiza a posição da câmera
-        transform.position = smoothedPosition;
+        // Aplicar rotação limitada
+        float pitch = Mathf.Clamp(-deltaY * rotationSpeed, -45f, 45f);
+        float yaw = deltaX * rotationSpeed;
 
-        // Faz a câmera olhar para a nave
-        transform.LookAt(spaceship);
+        targetForward = Quaternion.AngleAxis(yaw, transform.up) * targetForward;
+        targetForward = Quaternion.AngleAxis(pitch, transform.right) * targetForward;
+
+        transform.forward = Vector3.Lerp(transform.forward, targetForward, Time.deltaTime * rotationSpeed);
+
+        // Aceleração e desaceleração
+        if (Input.GetKey(KeyCode.W))
+        {
+            speed += acceleration * Time.deltaTime;
+        }
+        else
+        {
+            speed -= acceleration * Time.deltaTime;
+        }
+
+        // Limitar velocidade
+        speed = Mathf.Clamp(speed, 0, maxSpeed);
+
+        // Movimentar a nave para frente
+        transform.position += transform.forward * speed * Time.deltaTime;
+
+        // Movimentos laterais e verticais
+        if (Input.GetKey(KeyCode.A))
+        {
+            transform.position -= transform.right * sidewaysSpeed * Time.deltaTime;
+        }
+        if (Input.GetKey(KeyCode.D))
+        {
+            transform.position += transform.right * sidewaysSpeed * Time.deltaTime;
+        }
+        if (Input.GetKey(KeyCode.Q))
+        {
+            transform.position -= transform.up * sidewaysSpeed * Time.deltaTime;
+        }
+        if (Input.GetKey(KeyCode.E))
+        {
+            transform.position += transform.up * sidewaysSpeed * Time.deltaTime;
+        }
+
+        // Influência gravitacional de corpos celestiais
+        foreach (var celestialBody in GameObject.FindGameObjectsWithTag("CelestialBody"))
+        {
+            GameObject body = celestialBody.transform.Find("Body")?.gameObject;
+            if (body != null)
+            {
+                float radius = body.transform.localScale.x / 2;
+
+                float distanceToSurface = Vector3.Distance(transform.position, celestialBody.transform.position) - radius;
+                float gInfluence = gravityInfluenceFactor * radius;
+
+                float t = 1 - Mathf.Clamp01(distanceToSurface / gInfluence);
+
+                if (distanceToSurface < gInfluence)
+                {
+                    Vector3 targetUp = (transform.position - celestialBody.transform.position).normalized;
+                    Vector3 currentUp = Vector3.Lerp(transform.up, targetUp, t);
+                    transform.LookAt(transform.position + transform.forward, currentUp);
+                }
+            }
+        }
+
+        // Atualizar posição e orientação da câmera
+        if (cameraTransform != null)
+        {
+            cameraTransform.position = transform.position + cameraOffset;
+            cameraTransform.LookAt(transform.position);
+        }
+    }
+
+    void OnDrawGizmos()
+    {
+        Gizmos.color = Color.blue;
+        Gizmos.DrawLine(transform.position, transform.position + targetForward * 5);
     }
 }
