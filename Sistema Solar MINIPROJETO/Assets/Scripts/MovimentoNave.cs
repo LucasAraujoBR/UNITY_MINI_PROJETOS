@@ -1,4 +1,5 @@
 using UnityEngine;
+using TMPro; // Importação necessária para TextMeshProUGUI
 
 public class ControlSpaceship : MonoBehaviour
 {
@@ -7,43 +8,51 @@ public class ControlSpaceship : MonoBehaviour
     public float maxSpeed = 100f;
     public float sidewaysSpeed = 25f;
     public float rotationSpeed = 2f;
-    public float gravityInfluenceFactor = 1f;
 
     private Vector3 targetForward = Vector3.zero;
 
-    // Câmera que seguirá a nave
     public Transform cameraTransform;
     public Vector3 cameraOffset = new Vector3(0, 5, -10);
 
-    // Referência ao AudioSource
     private AudioSource engineAudio;
+    public ParticleSystem propulsionEffect; // Efeito de propulsão
+
+    // Referência ao campo de texto da UI
+    public TextMeshProUGUI nomeJogadoresText;
 
     void Start()
     {
-        // Inicializar a direção da nave
         targetForward = transform.forward;
 
-        // Verificar se a câmera foi atribuída
         if (cameraTransform == null && Camera.main != null)
         {
             cameraTransform = Camera.main.transform;
         }
 
-        // Obter o AudioSource do GameObject
         engineAudio = GetComponent<AudioSource>();
         if (engineAudio == null)
         {
             Debug.LogWarning("AudioSource não encontrado! Certifique-se de que um está adicionado ao GameObject.");
         }
+
+        // Recuperar os nomes dos jogadores armazenados
+        string nomeJogador1 = PlayerPrefs.GetString("NomeJogador1", "Jogador 1");
+        string nomeJogador2 = PlayerPrefs.GetString("NomeJogador2", "Jogador 2");
+
+        // Exibir os nomes na UI
+        if (nomeJogadoresText != null)
+        {
+            nomeJogadoresText.text = (nomeJogador2 == "Jogador 2")
+                ? $"Piloto: {nomeJogador1}"
+                : $"Pilotos: {nomeJogador1} & {nomeJogador2}";
+        }
     }
 
     void Update()
     {
-        // Entrada do mouse para rotação
         float deltaX = Input.GetAxis("Mouse X");
         float deltaY = Input.GetAxis("Mouse Y");
 
-        // Aplicar rotação limitada
         float pitch = Mathf.Clamp(-deltaY * rotationSpeed, -45f, 45f);
         float yaw = deltaX * rotationSpeed;
 
@@ -52,78 +61,45 @@ public class ControlSpaceship : MonoBehaviour
 
         transform.forward = Vector3.Lerp(transform.forward, targetForward, Time.deltaTime * rotationSpeed);
 
-        // Aceleração e desaceleração
         if (Input.GetKey(KeyCode.W))
         {
             speed += acceleration * Time.deltaTime;
 
-            // Tocar o som do motor ao acelerar
-             if (engineAudio != null && !engineAudio.isPlaying)
-             {
-              engineAudio.Play();
-             }
-        }
-        else
-        {
-            speed -= acceleration * Time.deltaTime;
+            if (engineAudio != null && !engineAudio.isPlaying)
+                engineAudio.Play();
 
-            // Parar o som do motor quando não estiver acelerando
-            if (engineAudio != null && engineAudio.isPlaying)
+            if (propulsionEffect != null)
             {
-            engineAudio.Stop();
-            }
-        }
-
-        // Limitar velocidade
-        speed = Mathf.Clamp(speed, 0, maxSpeed);
-
-        // Movimentar a nave para frente
-        transform.position += transform.forward * speed * Time.deltaTime;
-
-        // Movimentos laterais e verticais
-        if (Input.GetKey(KeyCode.A))
-        {
-            transform.position -= transform.right * sidewaysSpeed * Time.deltaTime;
-        }
-        if (Input.GetKey(KeyCode.D))
-        {
-            transform.position += transform.right * sidewaysSpeed * Time.deltaTime;
-        }
-        if (Input.GetKey(KeyCode.Q))
-        {
-            transform.position -= transform.up * sidewaysSpeed * Time.deltaTime;
-        }
-        if (Input.GetKey(KeyCode.E))
-        {
-            transform.position += transform.up * sidewaysSpeed * Time.deltaTime;
-        }
-
-        // Influência gravitacional de corpos celestiais
-        foreach (var celestialBody in GameObject.FindGameObjectsWithTag("CelestialBody"))
-        {
-            GameObject body = celestialBody.transform.Find("Body")?.gameObject;
-            if (body != null)
-            {
-                float radius = body.transform.localScale.x / 2;
-
-                float distanceToSurface = Vector3.Distance(transform.position, celestialBody.transform.position) - radius;
-                float gInfluence = gravityInfluenceFactor * radius;
-
-                float t = 1 - Mathf.Clamp01(distanceToSurface / gInfluence);
-
-                if (distanceToSurface < gInfluence)
+                if (!propulsionEffect.isPlaying)
                 {
-                    Vector3 targetUp = (transform.position - celestialBody.transform.position).normalized;
-                    Vector3 currentUp = Vector3.Lerp(transform.up, targetUp, t);
-                    transform.LookAt(transform.position + transform.forward, currentUp);
+                    propulsionEffect.Play();
+                    Debug.Log("Efeito de propulsão ativado!");
                 }
             }
         }
 
-        // Atualizar posição e orientação da câmera
+        else
+        {
+            speed -= acceleration * Time.deltaTime;
+            if (engineAudio != null && engineAudio.isPlaying) engineAudio.Stop();
+
+            if (propulsionEffect != null && propulsionEffect.isPlaying)
+                propulsionEffect.Stop();
+        }
+
+        speed = Mathf.Clamp(speed, 0, maxSpeed);
+        transform.position += transform.forward * speed * Time.deltaTime;
+
+        if (Input.GetKey(KeyCode.A)) transform.position -= transform.right * sidewaysSpeed * Time.deltaTime;
+        if (Input.GetKey(KeyCode.D)) transform.position += transform.right * sidewaysSpeed * Time.deltaTime;
+        if (Input.GetKey(KeyCode.Q)) transform.position -= transform.up * sidewaysSpeed * Time.deltaTime;
+        if (Input.GetKey(KeyCode.E)) transform.position += transform.up * sidewaysSpeed * Time.deltaTime;
+
         if (cameraTransform != null)
         {
             cameraTransform.position = transform.position + cameraOffset;
+            propulsionEffect.transform.position = transform.position - transform.forward * 2f; // Ajuste a distância
+            propulsionEffect.transform.rotation = transform.rotation;
             cameraTransform.LookAt(transform.position);
         }
     }
